@@ -18,3 +18,7 @@ First project in my 100 Days of Web3 challenge.
 
 ## Preview
 Web3 wallet connection interface using modern tooling.
+
+## Preview
+
+![Preview](./public/preview.png)
