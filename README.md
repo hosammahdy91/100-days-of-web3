@@ -22,3 +22,12 @@ Web3 wallet connection interface using modern tooling.
 ## Preview
 
 ![Preview](./public/preview.png)
+
+## Day 03 — Send ETH Flow
+
+### Features
+- Send ETH Transactions
+- Transaction Confirmation
+- Loading States
+- Success UI
+- Blockchain Interaction
