@@ -15,11 +15,47 @@ import {
   useAccount,
   useBalance,
   useChainId,
-  useSendTransaction,
+  useWriteContract,
   useWaitForTransactionReceipt,
+  useSendTransaction,
 } from 'wagmi'
 
-import { parseEther } from 'viem'
+import {
+  parseUnits,
+  parseEther,
+} from 'viem'
+
+const USDC_ADDRESSES: Record<number, `0x${string}`> = {
+  1: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  10: '0x0b2C639c533813f4Aa9D7837CaF62653d097Ff85',
+  137: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+  42161: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+  8453: '0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913',
+}
+
+const ERC20_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    stateMutability: 'nonpayable',
+    inputs: [
+      {
+        name: 'to',
+        type: 'address',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+      },
+    ],
+  },
+] as const
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -27,6 +63,9 @@ export default function Home() {
   const [recipient, setRecipient] = useState('')
 
   const [amount, setAmount] = useState('')
+
+  const [asset, setAsset] =
+    useState<'ETH' | 'USDC'>('ETH')
 
   const { address, isConnected } = useAccount()
 
@@ -37,24 +76,35 @@ export default function Home() {
   })
 
   const {
-    data: hash,
-    isPending,
+    data: usdcHash,
+    isPending: usdcPending,
+    writeContract,
+  } = useWriteContract()
+
+  const {
+    data: ethHash,
+    isPending: ethPending,
     sendTransaction,
   } = useSendTransaction()
 
-  const { isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  })
+  const currentHash =
+    usdcHash || ethHash
+
+  const { isSuccess } =
+    useWaitForTransactionReceipt({
+      hash: currentHash,
+    })
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  if (!mounted) {
-    return null
-  }
+  if (!mounted) return null
 
-  const handleSend = async () => {
+  const usdcAddress =
+    USDC_ADDRESSES[chainId]
+
+  const handleSendETH = () => {
     if (!recipient || !amount) return
 
     sendTransaction({
@@ -63,9 +113,38 @@ export default function Home() {
     })
   }
 
+  const handleSendUSDC = () => {
+    if (!recipient || !amount) return
+
+    if (!usdcAddress) {
+      alert('Network not supported')
+      return
+    }
+
+    writeContract({
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      functionName: 'transfer',
+      args: [
+        recipient as `0x${string}`,
+        parseUnits(amount, 6),
+      ],
+    })
+  }
+
+  const handleSend = () => {
+    if (asset === 'ETH') {
+      handleSendETH()
+      return
+    }
+
+    if (asset === 'USDC') {
+      handleSendUSDC()
+    }
+  }
+
   return (
     <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-
       <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
 
         <div className="flex items-center gap-3 mb-6">
@@ -73,11 +152,11 @@ export default function Home() {
 
           <div>
             <h1 className="text-3xl font-bold">
-              Day 03 🚀
+              Day 05 🚀
             </h1>
 
             <p className="text-zinc-400 text-sm">
-              Send ETH App
+              Multi-Chain Asset Sender
             </p>
           </div>
         </div>
@@ -95,8 +174,45 @@ export default function Home() {
               </p>
 
               <p className="text-2xl font-bold">
-                {balance?.formatted.slice(0, 6)} {balance?.symbol}
+                {balance?.formatted?.slice(0, 8)}{' '}
+                {balance?.symbol}
               </p>
+            </div>
+
+            <div className="rounded-2xl bg-zinc-800 p-4">
+              <p className="text-zinc-400 text-sm mb-1">
+                Current Chain
+              </p>
+
+              <p className="text-xl font-bold">
+                {chainId}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-zinc-800 p-4">
+              <p className="text-zinc-400 text-sm mb-2">
+                Asset
+              </p>
+
+              <select
+                value={asset}
+                onChange={(e) =>
+                  setAsset(
+                    e.target.value as
+                      | 'ETH'
+                      | 'USDC'
+                  )
+                }
+                className="w-full rounded-xl bg-black border border-zinc-700 p-3"
+              >
+                <option value="ETH">
+                  ETH
+                </option>
+
+                <option value="USDC">
+                  USDC
+                </option>
+              </select>
             </div>
 
             <div className="rounded-2xl bg-zinc-800 p-4">
@@ -106,7 +222,11 @@ export default function Home() {
 
               <input
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={(e) =>
+                  setRecipient(
+                    e.target.value
+                  )
+                }
                 placeholder="0x..."
                 className="w-full rounded-xl bg-black border border-zinc-700 p-3 outline-none"
               />
@@ -114,65 +234,62 @@ export default function Home() {
 
             <div className="rounded-2xl bg-zinc-800 p-4">
               <p className="text-zinc-400 text-sm mb-2">
-                Amount (ETH)
+                Amount ({asset})
               </p>
 
               <input
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.01"
+                onChange={(e) =>
+                  setAmount(
+                    e.target.value
+                  )
+                }
+                placeholder={
+                  asset === 'ETH'
+                    ? '0.01'
+                    : '10'
+                }
                 className="w-full rounded-xl bg-black border border-zinc-700 p-3 outline-none"
               />
             </div>
 
             <button
               onClick={handleSend}
-              disabled={isPending}
+              disabled={
+                usdcPending ||
+                ethPending
+              }
               className="w-full rounded-2xl bg-green-500 hover:bg-green-400 transition p-4 font-bold text-black flex items-center justify-center gap-2"
             >
-
-              {isPending ? (
+              {usdcPending ||
+              ethPending ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Sending...
+                  Sending {asset}...
                 </>
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  Send ETH
+                  Send {asset}
                 </>
               )}
-
             </button>
 
             {isSuccess && (
               <div className="rounded-2xl bg-green-500/20 border border-green-500 p-4 flex items-center gap-3">
-
                 <CheckCircle2 className="text-green-400" />
 
                 <div>
                   <p className="font-bold text-green-400">
-                    Transaction Successful
+                    {asset} Sent Successfully
                   </p>
 
                   <p className="text-sm break-all">
-                    {hash}
+                    {currentHash}
                   </p>
                 </div>
-
               </div>
             )}
-
-            <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-1">
-                Network
-              </p>
-
-              <p className="text-xl font-bold">
-                Chain ID: {chainId}
-              </p>
-            </div>
-
           </div>
         ) : (
           <div className="rounded-2xl bg-zinc-800 p-6 text-center">
@@ -181,9 +298,7 @@ export default function Home() {
             </p>
           </div>
         )}
-
       </div>
-
     </main>
   )
 }

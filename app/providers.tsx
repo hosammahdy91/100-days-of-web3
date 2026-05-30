@@ -7,11 +7,15 @@ import {
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit'
 
-import {
-  WagmiProvider,
-} from 'wagmi'
+import { WagmiProvider } from 'wagmi'
 
-import { mainnet } from 'wagmi/chains'
+import {
+  mainnet,
+  base,
+  arbitrum,
+  polygon,
+  optimism,
+} from 'wagmi/chains'
 
 import {
   QueryClientProvider,
@@ -19,9 +23,15 @@ import {
 } from '@tanstack/react-query'
 
 const config = getDefaultConfig({
-  appName: 'Day 01 Wallet Connect',
+  appName: '100 Days of Web3',
   projectId: '697954beac9445159214a7ccfc4b81c1',
-  chains: [mainnet],
+  chains: [
+    mainnet,
+    base,
+    arbitrum,
+    polygon,
+    optimism,
+  ],
 })
 
 const queryClient = new QueryClient()
