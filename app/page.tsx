@@ -39,41 +39,31 @@ const ERC20_ABI = [
     name: 'transfer',
     stateMutability: 'nonpayable',
     inputs: [
-      {
-        name: 'to',
-        type: 'address',
-      },
-      {
-        name: 'amount',
-        type: 'uint256',
-      },
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
     ],
-    outputs: [
-      {
-        name: '',
-        type: 'bool',
-      },
-    ],
+    outputs: [{ name: '', type: 'bool' }],
   },
 ] as const
 
+type Transaction = {
+  asset: 'ETH' | 'USDC'
+  amount: string
+  hash: string
+  timestamp: string
+}
+
 export default function Home() {
   const [mounted, setMounted] = useState(false)
-
   const [recipient, setRecipient] = useState('')
-
   const [amount, setAmount] = useState('')
-
-  const [asset, setAsset] =
-    useState<'ETH' | 'USDC'>('ETH')
+  const [asset, setAsset] = useState<'ETH' | 'USDC'>('ETH')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
 
   const { address, isConnected } = useAccount()
-
   const chainId = useChainId()
 
-  const { data: balance } = useBalance({
-    address,
-  })
+  const { data: balance } = useBalance({ address })
 
   const {
     data: usdcHash,
@@ -87,22 +77,45 @@ export default function Home() {
     sendTransaction,
   } = useSendTransaction()
 
-  const currentHash =
-    usdcHash || ethHash
+  const currentHash = usdcHash || ethHash
 
-  const { isSuccess } =
-    useWaitForTransactionReceipt({
-      hash: currentHash,
-    })
+  const { isSuccess } = useWaitForTransactionReceipt({
+    hash: currentHash,
+  })
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    const saved = localStorage.getItem('transactions')
+    if (saved) {
+      setTransactions(JSON.parse(saved))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSuccess || !currentHash) return
+
+    const exists = transactions.find((t) => t.hash === currentHash)
+    if (exists) return
+
+    const tx: Transaction = {
+      asset,
+      amount,
+      hash: currentHash,
+      timestamp: new Date().toLocaleString(),
+    }
+
+    const updated = [tx, ...transactions]
+
+    setTransactions(updated)
+    localStorage.setItem('transactions', JSON.stringify(updated))
+  }, [isSuccess, currentHash])
+
   if (!mounted) return null
 
-  const usdcAddress =
-    USDC_ADDRESSES[chainId]
+  const usdcAddress = USDC_ADDRESSES[chainId]
 
   const handleSendETH = () => {
     if (!recipient || !amount) return
@@ -133,30 +146,19 @@ export default function Home() {
   }
 
   const handleSend = () => {
-    if (asset === 'ETH') {
-      handleSendETH()
-      return
-    }
-
-    if (asset === 'USDC') {
-      handleSendUSDC()
-    }
+    if (asset === 'ETH') return handleSendETH()
+    handleSendUSDC()
   }
 
   return (
     <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
       <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
-
         <div className="flex items-center gap-3 mb-6">
           <Wallet className="w-8 h-8 text-green-400" />
-
           <div>
-            <h1 className="text-3xl font-bold">
-              Day 05 🚀
-            </h1>
-
+            <h1 className="text-3xl font-bold">Day 06 🚀</h1>
             <p className="text-zinc-400 text-sm">
-              Multi-Chain Asset Sender
+              Multi-Chain Wallet + History
             </p>
           </div>
         </div>
@@ -167,102 +169,56 @@ export default function Home() {
 
         {isConnected ? (
           <div className="space-y-4">
-
             <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-1">
-                Wallet Balance
-              </p>
-
+              <p className="text-zinc-400 text-sm mb-1">Wallet Balance</p>
               <p className="text-2xl font-bold">
-                {balance?.formatted?.slice(0, 8)}{' '}
-                {balance?.symbol}
+                {balance?.formatted?.slice(0, 8)} {balance?.symbol}
               </p>
             </div>
 
             <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-1">
-                Current Chain
-              </p>
-
-              <p className="text-xl font-bold">
-                {chainId}
-              </p>
+              <p className="text-zinc-400 text-sm mb-1">Current Chain</p>
+              <p className="text-xl font-bold">{chainId}</p>
             </div>
 
             <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-2">
-                Asset
-              </p>
-
+              <p className="text-zinc-400 text-sm mb-2">Asset</p>
               <select
                 value={asset}
-                onChange={(e) =>
-                  setAsset(
-                    e.target.value as
-                      | 'ETH'
-                      | 'USDC'
-                  )
-                }
+                onChange={(e) => setAsset(e.target.value as 'ETH' | 'USDC')}
                 className="w-full rounded-xl bg-black border border-zinc-700 p-3"
               >
-                <option value="ETH">
-                  ETH
-                </option>
-
-                <option value="USDC">
-                  USDC
-                </option>
+                <option value="ETH">ETH</option>
+                <option value="USDC">USDC</option>
               </select>
             </div>
 
             <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-2">
-                Recipient Address
-              </p>
-
+              <p className="text-zinc-400 text-sm mb-2">Recipient Address</p>
               <input
                 value={recipient}
-                onChange={(e) =>
-                  setRecipient(
-                    e.target.value
-                  )
-                }
+                onChange={(e) => setRecipient(e.target.value)}
                 placeholder="0x..."
                 className="w-full rounded-xl bg-black border border-zinc-700 p-3 outline-none"
               />
             </div>
 
             <div className="rounded-2xl bg-zinc-800 p-4">
-              <p className="text-zinc-400 text-sm mb-2">
-                Amount ({asset})
-              </p>
-
+              <p className="text-zinc-400 text-sm mb-2">Amount ({asset})</p>
               <input
                 value={amount}
-                onChange={(e) =>
-                  setAmount(
-                    e.target.value
-                  )
-                }
-                placeholder={
-                  asset === 'ETH'
-                    ? '0.01'
-                    : '10'
-                }
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={asset === 'ETH' ? '0.01' : '10'}
                 className="w-full rounded-xl bg-black border border-zinc-700 p-3 outline-none"
               />
             </div>
 
             <button
               onClick={handleSend}
-              disabled={
-                usdcPending ||
-                ethPending
-              }
+              disabled={usdcPending || ethPending}
               className="w-full rounded-2xl bg-green-500 hover:bg-green-400 transition p-4 font-bold text-black flex items-center justify-center gap-2"
             >
-              {usdcPending ||
-              ethPending ? (
+              {usdcPending || ethPending ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
                   Sending {asset}...
@@ -278,24 +234,50 @@ export default function Home() {
             {isSuccess && (
               <div className="rounded-2xl bg-green-500/20 border border-green-500 p-4 flex items-center gap-3">
                 <CheckCircle2 className="text-green-400" />
-
                 <div>
                   <p className="font-bold text-green-400">
                     {asset} Sent Successfully
                   </p>
-
-                  <p className="text-sm break-all">
-                    {currentHash}
-                  </p>
+                  <p className="text-sm break-all">{currentHash}</p>
                 </div>
               </div>
             )}
+
+            <div className="rounded-2xl bg-zinc-800 p-4">
+              <h2 className="text-lg font-bold mb-4">Recent Transactions</h2>
+
+              {transactions.length === 0 ? (
+                <p className="text-zinc-400">No transactions yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {transactions.map((tx, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl bg-black p-3 border border-zinc-700"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-bold text-green-400">
+                          {tx.asset}
+                        </span>
+                        <span>{tx.amount}</span>
+                      </div>
+
+                      <p className="text-xs text-zinc-400 break-all mt-2">
+                        {tx.hash}
+                      </p>
+
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {tx.timestamp}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl bg-zinc-800 p-6 text-center">
-            <p className="text-red-400">
-              Wallet Not Connected
-            </p>
+            <p className="text-red-400">Wallet Not Connected</p>
           </div>
         )}
       </div>
